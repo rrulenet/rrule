@@ -1,0 +1,25 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "strict": true,
+    "declaration": true,
+    "sourceMap": true,
+    "outDir": "dist",
+    "rootDir": "src",
+    "skipLibCheck": true
+  },
+  "include": [
+    "src/index.ts",
+    "src/RRule.ts",
+    "src/RRuleSet.ts",
+    "src/SetAlgebra.ts",
+    "src/rrulestr.ts",
+    "src/types.ts",
+    "src/weekday.ts",
+    "src/dateutil.ts",
+    "src/internal/parseText.ts",
+    "src/internal/text.ts"
+  ]
+}

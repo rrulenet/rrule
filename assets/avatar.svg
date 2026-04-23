@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="500" height="500" viewBox="0 0 500 500" role="img" aria-labelledby="title desc">
+  <title id="title">rrule.net GitHub organization avatar</title>
+  <desc id="desc">White calendar-clock icon on blue background</desc>
+  <rect x="22" y="22" width="456" height="456" rx="92" fill="#2563EB" />
+  <rect x="22" y="22" width="456" height="456" rx="92" fill="none" stroke="rgba(255,255,255,0.24)" stroke-width="4" />
+  <g transform="translate(99 99) scale(12.5833333333)" fill="none" stroke="#FFFFFF" stroke-linecap="round" stroke-linejoin="round" stroke-width="2.15">
+    <path d="M16 14v2.2l1.6 1M16 2v4m5 1.5V6a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h3.5M3 10h5m0-8v4"/>
+    <circle cx="16" cy="16" r="6"/>
+  </g>
+</svg>

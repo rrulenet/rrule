@@ -1,0 +1,7 @@
+node_modules/
+dist/
+.DS_Store
+*.tgz
+npm-debug.log*
+coverage-output.txt
+badges/
