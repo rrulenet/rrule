@@ -70,6 +70,9 @@ That makes it a good fit for:
 - existing codebases built around `Date`
 - applications that want a familiar class-based API without moving their boundary to `Temporal`
 
+See also:
+- [Comparisons](./docs/COMPARISONS.md)
+
 ## API
 
 ```js
