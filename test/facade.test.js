@@ -28,6 +28,13 @@ test('rrule facade: fromString returns local RRule instances', () => {
   ]);
 });
 
+test('rrule facade: rejects the malformed recurrence guarded by n8n', () => {
+  assert.throws(
+    () => rrule.RRule.fromString('DTSTART:20250101T090000Z\nRRULE:INVALID_RULE'),
+    /Unknown RRULE property 'INVALID_RULE'/,
+  );
+});
+
 test('rrule facade: rrulestr returns local RRuleSet instances for sets', () => {
   const set = rrule.rrulestr(
     'DTSTART:20250101T090000Z\nRRULE:FREQ=DAILY;COUNT=3\nEXDATE:20250102T090000Z',
