@@ -285,20 +285,31 @@ function toCompactUtc(date: Date) {
 }
 
 function renderDateProperty(kind: 'DTSTART' | 'RDATE' | 'EXDATE', date: Date, tzid?: string) {
+  if (date.getUTCMilliseconds()) throw new RangeError('RFC 5545 cannot preserve fractional seconds');
+  if (tzid) {
+    const local = dateToZdt(date, tzid);
+    if (local.toPlainDateTime().toZonedDateTime(tzid).epochNanoseconds !== local.epochNanoseconds) tzid = 'UTC';
+  }
   const isUtc = !tzid || tzid.toUpperCase() === 'UTC';
   const header = isUtc ? `${kind}:` : `${kind};TZID=${tzid}:`;
   if (isUtc) return `${header}${toCompactUtc(date)}`;
-  return `${header}${dateToZdt(date, tzid).toString({ smallestUnit: 'second' }).replace(/[-:]/g, '').slice(0, 15)}`;
+  return `${header}${dateToZdt(date, tzid ?? 'UTC').toString({ smallestUnit: 'second' }).replace(/[-:]/g, '').slice(0, 15)}`;
 }
 
 function renderDateList(kind: 'RDATE' | 'EXDATE', dates: Date[], tzid?: string) {
-  const isUtc = !tzid || tzid.toUpperCase() === 'UTC';
-  const header = isUtc ? `${kind}:` : `${kind};TZID=${tzid}:`;
+  let resolvedTzid = tzid ?? 'UTC';
+  if (dates.some(date => date.getUTCMilliseconds())) throw new RangeError('RFC 5545 cannot preserve fractional seconds');
+  if (dates.some(date => {
+    const local = dateToZdt(date, resolvedTzid);
+    return local.toPlainDateTime().toZonedDateTime(resolvedTzid).epochNanoseconds !== local.epochNanoseconds;
+  })) resolvedTzid = 'UTC';
+  const isUtc = resolvedTzid.toUpperCase() === 'UTC';
+  const header = isUtc ? `${kind}:` : `${kind};TZID=${resolvedTzid}:`;
   if (isUtc) {
     return `${header}${dates.map((date) => toCompactUtc(date)).join(',')}`;
   }
 
   return `${header}${dates
-    .map((date) => dateToZdt(date, tzid).toString({ smallestUnit: 'second' }).replace(/[-:]/g, '').slice(0, 15))
+    .map((date) => dateToZdt(date, resolvedTzid).toString({ smallestUnit: 'second' }).replace(/[-:]/g, '').slice(0, 15))
     .join(',')}`;
 }

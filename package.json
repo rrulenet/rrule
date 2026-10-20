@@ -1,6 +1,6 @@
 {
   "name": "@rrulenet/rrule",
-  "version": "0.1.9",
+  "version": "0.2.0",
   "description": "Classic rrule.js-style recurrence API, backed by a maintained engine built for production scheduling.",
   "license": "MIT",
   "type": "module",
@@ -45,11 +45,11 @@
     "perf": "npm run build && node perf/perf.mjs"
   },
   "dependencies": {
-    "@rrulenet/core": "^0.1.9",
-    "temporal-polyfill": "^1.0.4"
+    "@rrulenet/core": "^0.2.0",
+    "temporal-polyfill": "^1.0.6"
   },
   "devDependencies": {
-    "@types/node": "^26.4.0",
+    "@types/node": "^26.6.5",
     "typescript": "6.0.3"
   },
   "engines": {

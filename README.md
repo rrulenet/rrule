@@ -235,6 +235,22 @@ console.log(parsed.toString());
 // EXDATE:20260412T090000Z
 ```
 
+## Local time and DST (0.2.0)
+
+All supported RFC frequencies use nominal calendar progression in their timezone.
+An ambiguous autumn time selects its first passage; a nonexistent spring time
+uses the pre-transition offset (RFC 5545, verified erratum 4271). Later periods
+return to their nominal time. Spring collisions count once, and COUNT cannot be
+combined with UNTIL. Invalid dates such as an implicit September 31 are omitted.
+UNTIL exports use UTC.
+
+This changes local subdaily behavior from earlier releases. For a fixed elapsed
+cadence, use `Recurrence.elapsed` in `@rrulenet/recurrence`, or a simple UTC rule
+when it expresses the required sequence. Explicit RDATE/EXDATE instants retain
+both overlap passages; their export uses UTC when needed. A rule whose exact
+second-passage DTSTART cannot survive local RFC export throws instead of
+silently moving the boundary.
+
 ## Notes
 
 - `RSCALE` and `SKIP` are part of the compat rule model.
