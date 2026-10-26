@@ -251,6 +251,20 @@ both overlap passages; their export uses UTC when needed. A rule whose exact
 second-passage DTSTART cannot survive local RFC export throws instead of
 silently moving the boundary.
 
+## Selector validation
+
+The constructor, `parseString()`, `fromString()`, and `rrulestr()` throw a
+`RangeError` for invalid `byhour`, `byminute`, `bysecond`, `bymonth`, or
+`bymonthday` values, including invalid members of a list. The message identifies
+the selector and value. Inputs such as `byhour: [9, 25]` are rejected instead
+of silently changing the recurrence to 09:00.
+
+`BYSECOND=60` remains accepted and resolves to second 59, following RFC 5545's
+fallback for implementations without leap-second support. Collisions count
+once and are removed before BYSETPOS. The original selector is preserved by
+serialization. Valid negative month days, supported RSCALE leap-month tokens,
+and omission of nonexistent generated dates remain supported.
+
 ## Notes
 
 - `RSCALE` and `SKIP` are part of the compat rule model.
