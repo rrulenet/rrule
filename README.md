@@ -265,6 +265,9 @@ once and are removed before BYSETPOS. The original selector is preserved by
 serialization. Valid negative month days, supported RSCALE leap-month tokens,
 and omission of nonexistent generated dates remain supported.
 
+Repeated clock selector members do not shift BYSETPOS positions or consume
+COUNT. Serialization preserves the original lists, including repeated values.
+
 ## Notes
 
 - `RSCALE` and `SKIP` are part of the compat rule model.
