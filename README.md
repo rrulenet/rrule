@@ -268,6 +268,16 @@ and omission of nonexistent generated dates remain supported.
 Repeated clock selector members do not shift BYSETPOS positions or consume
 COUNT. Serialization preserves the original lists, including repeated values.
 
+BYSETPOS selects from the distinct chronological candidates of a complete
+frequency interval, including the whole year for yearly rules spanning months.
+Numeric RFC tokens are checked before conversion: empty members, hexadecimal,
+exponent, fractional, and unsafe integer tokens are rejected.
+
+Calendar searches return empty results for proven unreachable clock phases.
+If a calendar query exhausts its search budget without establishing completeness,
+it propagates an error with code `RECURRENCE_SEARCH_LIMIT`; this is not proof of
+an empty recurrence.
+
 ## Notes
 
 - `RSCALE` and `SKIP` are part of the compat rule model.
