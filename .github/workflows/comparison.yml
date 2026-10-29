@@ -1,0 +1,62 @@
+name: Published package comparison
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths: ['comparison/**', 'playground/**', '.github/workflows/comparison.yml', '.github/workflows/coverage-badge.yml']
+  push:
+    branches: [main]
+    paths: ['comparison/**', 'playground/**', '.github/workflows/comparison.yml', '.github/workflows/coverage-badge.yml']
+
+permissions:
+  contents: read
+
+jobs:
+  corpus:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        node: [22, 24]
+        timezone: [UTC, America/New_York, Pacific/Kiritimati]
+    env:
+      TZ: ${{ matrix.timezone }}
+    defaults:
+      run:
+        working-directory: playground
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v6
+        with:
+          node-version: ${{ matrix.node }}
+          cache: npm
+          cache-dependency-path: playground/package-lock.json
+      - run: npm ci --ignore-scripts --workspaces=false
+      - run: npm test
+      - run: npm run compare
+      - uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: comparison-node-${{ matrix.node }}-${{ strategy.job-index }}
+          path: playground/reports/
+  browser:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: playground
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: playground/package-lock.json
+      - run: npm ci --ignore-scripts --workspaces=false
+      - run: npx playwright install --with-deps chromium
+      - run: npm run build
+      - run: npm run test:browser
+      - uses: actions/upload-artifact@v6
+        if: failure()
+        with:
+          name: browser-failures
+          path: playground/test-results/

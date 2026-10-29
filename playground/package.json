@@ -1,0 +1,25 @@
+{
+  "name": "rrulenet-comparison-playground",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "engines": { "node": ">=22" },
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "preview": "node scripts/serve.mjs",
+    "compare": "node scripts/compare.mjs",
+    "test": "node --test test/*.test.mjs",
+    "test:browser": "playwright test"
+  },
+  "dependencies": {
+    "@rrulenet/core": "0.2.1",
+    "rrulenet-published": "npm:@rrulenet/rrule@0.2.1",
+    "rrule": "2.8.1",
+    "rrule-temporal": "2.2.8",
+    "temporal-polyfill": "1.0.6"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.64.1",
+    "esbuild": "0.28.2"
+  }
+}

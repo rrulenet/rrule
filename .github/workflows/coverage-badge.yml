@@ -1,4 +1,4 @@
-name: Coverage Badge
+name: Coverage and comparison Pages
 
 on:
   workflow_dispatch:
@@ -14,6 +14,9 @@ on:
       - 'tsconfig.json'
       - 'scripts/write-coverage-badge.mjs'
       - '.github/workflows/coverage-badge.yml'
+      - 'comparison/**'
+      - 'playground/**'
+      - 'assets/**'
 
 permissions:
   contents: read
@@ -27,6 +30,9 @@ concurrency:
 jobs:
   coverage-badge:
     runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
 
     steps:
       - name: Check out repository
@@ -39,13 +45,32 @@ jobs:
           cache: npm
 
       - name: Install dependencies
-        run: npm ci
+        run: npm ci --ignore-scripts --workspaces=false
 
       - name: Run coverage
-        run: npm run coverage | tee coverage-output.txt
+        shell: bash
+        run: |
+          set -o pipefail
+          npm run coverage | tee coverage-output.txt
 
       - name: Generate badge payload
         run: npm run coverage:badge
+
+      - name: Install pinned comparison packages
+        working-directory: playground
+        run: npm ci --ignore-scripts --workspaces=false
+
+      - name: Verify the shared examples and published engines
+        working-directory: playground
+        env:
+          TZ: UTC
+        run: |
+          npm test
+          npm run compare
+
+      - name: Build the playground and preserve coverage.json
+        working-directory: playground
+        run: npm run build -- --with-coverage
 
       - name: Configure Pages
         uses: actions/configure-pages@v6
@@ -53,7 +78,8 @@ jobs:
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v5
         with:
-          path: ./badges
+          path: ./playground/site
 
       - name: Deploy to GitHub Pages
+        id: deployment
         uses: actions/deploy-pages@v5

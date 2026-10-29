@@ -5,3 +5,7 @@ dist/
 npm-debug.log*
 coverage-output.txt
 badges/
+playground/site/
+playground/reports/
+playground/test-results/
+playground/playwright-report/

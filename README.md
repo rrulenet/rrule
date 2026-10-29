@@ -87,6 +87,17 @@ callback returns a finite preview, not the complete series.
 See the [API reference and examples](https://github.com/rrulenet/rrule/blob/main/docs/API.md)
 for `RRuleSet`, `SetAlgebra`, parsing and locale registration.
 
+## Comparison playground
+
+The [interactive playground](./playground/README.md) compares `rrule.js`,
+`rrule-temporal` and `@rrulenet/rrule` using published npm versions. Paste an
+RRULE or choose a practical example in plain English, then compare their results.
+Share links can preserve your input for a bug report or discussion.
+
+Curated examples have explicit reference results. Custom rules are displayed
+without a correctness verdict. See the playground README for local preview
+commands and the planned Pages deployment.
+
 ## Timezones and validation
 
 Calendar frequencies advance on the local clock. Autumn overlaps select the
