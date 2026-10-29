@@ -86,11 +86,23 @@ export class RRule {
   }
 
   all(iterator?: (date: Date, index: number) => boolean): Date[] {
+    if (iterator) {
+      const out: Date[] = [];
+      for (const date of this.iterate()) {
+        if (!iterator(date, out.length)) break;
+        out.push(date);
+      }
+      return out;
+    }
     const values = !this.noCache && this.allCache
       ? this.allCache
       : this.source.all().map(zdtToDate);
     if (!this.noCache && !this.allCache) this.allCache = values;
-    return iterator ? applyIterator(values, iterator) : values;
+    return values;
+  }
+
+  *iterate(): Generator<Date> {
+    for (const value of this.source.iterate()) yield zdtToDate(value);
   }
 
   between(after: Date, before: Date, inc = false, iterator?: (date: Date, index: number) => boolean): Date[] {

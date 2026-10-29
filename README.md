@@ -132,6 +132,12 @@ console.log(rule.all().map((value) => value.toISOString()));
 
 ## Examples
 
+`rule.all(callback)` and `set.all(callback)` stream calendar occurrences until
+the callback returns `false`. They can read past the 513-value default preview
+of an unbounded `all()`. `rule.iterate()` and `set.iterate()` expose the same
+ordered stream for `for...of` callers. Explicit dates and exclusions retain
+their set semantics; COUNT limits the underlying RRULE before those operations.
+
 ### `RRule`
 
 ```js

@@ -101,11 +101,23 @@ export class RRuleSet extends RRule {
   }
 
   override all(iterator?: (date: Date, index: number) => boolean): Date[] {
+    if (iterator) {
+      const out: Date[] = [];
+      for (const date of this.iterate()) {
+        if (!iterator(date, out.length)) break;
+        out.push(date);
+      }
+      return out;
+    }
     const values = !this.setNoCache && this.setAllCache
       ? this.setAllCache
       : this.engine.all().map(zdtToDate);
     if (!this.setNoCache && !this.setAllCache) this.setAllCache = values;
-    return iterator ? applyIterator(values, iterator) : values;
+    return values;
+  }
+
+  override *iterate(): Generator<Date> {
+    for (const value of this.engine.iterate()) yield zdtToDate(value);
   }
 
   override between(after: Date, before: Date, inc = false, iterator?: (date: Date, index: number) => boolean): Date[] {

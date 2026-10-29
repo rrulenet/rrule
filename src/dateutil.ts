@@ -6,8 +6,9 @@ export function datetime(
   minute = 0,
   second = 0,
 ): Date {
-  const date = new Date(Date.UTC(0, month - 1, day, hour, minute, second, 0));
-  date.setUTCFullYear(year);
+  const date = new Date(0);
+  date.setUTCFullYear(year, month - 1, day);
+  date.setUTCHours(hour, minute, second, 0);
   return date;
 }
 
