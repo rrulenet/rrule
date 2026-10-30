@@ -1,0 +1,36 @@
+name: Recurrence reliability
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  invariants:
+    strategy:
+      fail-fast: false
+      matrix:
+        node: [20, 22, 24, 26]
+        timezone: [UTC, America/New_York, Pacific/Kiritimati]
+    runs-on: ubuntu-latest
+    env:
+      TZ: ${{ matrix.timezone }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci --ignore-scripts --workspaces=false
+      - run: npm run typecheck
+      - run: npm run build
+      - name: Select execution runtime
+        uses: actions/setup-node@v6
+        with:
+          node-version: ${{ matrix.node }}
+      - name: Test compiled artifacts
+        run: node --test test/*.test.js
