@@ -87,16 +87,13 @@ callback returns a finite preview, not the complete series.
 See the [API reference and examples](https://github.com/rrulenet/rrule/blob/main/docs/API.md)
 for `RRuleSet`, `SetAlgebra`, parsing and locale registration.
 
-## Comparison playground
+## RRULE Playground
 
-The [interactive playground](./playground/README.md) compares `rrule.js`,
-`rrule-temporal` and `@rrulenet/rrule` using published npm versions. Paste an
-RRULE or choose a practical example in plain English, then compare their results.
-Share links can preserve your input for a bug report or discussion.
-
-Curated examples have explicit reference results. Custom rules are displayed
-without a correctness verdict. See the playground README for local preview
-commands and the planned Pages deployment.
+Use the [playground](https://rrulenet.github.io/rrule/) to build a recurrence or
+paste iCalendar properties, preview the dates, and try `after()`, `before()`,
+and `between()` queries. The presets cover common schedules, exceptions, clock
+changes, and calendar extensions. The URL follows your edits, and **Copy share
+link** copies it for an issue or documentation example.
 
 ## Timezones and validation
 

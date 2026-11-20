@@ -3,34 +3,175 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="Try practical recurrence schedules and compare rrule.js, rrule-temporal and @rrulenet/rrule side by side.">
+  <meta name="description" content="Build and test recurrence rules with @rrulenet/rrule. Inspect occurrences in their time zone and share any rule by URL.">
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; worker-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; base-uri 'self'; object-src 'none'">
-  <title>Compare recurrence rules · rrule.net</title>
+  <title>RRULE Playground · rrule.net</title>
   <link rel="icon" type="image/svg+xml" href="./avatar.svg">
   <link rel="stylesheet" href="./style.css">
   <script type="module" src="./app.js"></script>
 </head>
 <body>
-  <a class="skip" href="#editor">Skip to RRULE</a>
-  <header class="topbar"><a class="brand" href="./"><img src="./avatar.svg" width="30" height="30" alt=""><span>rrule<span class="muted">.net</span></span></a><nav aria-label="Resources"><span class="nav-current">Playground</span><a href="https://github.com/rrulenet/rrule">GitHub ↗</a></nav></header>
-  <main>
-    <section class="intro"><p class="eyebrow">THE RECURRENCE PLAYGROUND</p><h1>One rule. <span>Three engines.</span></h1><p>Try a real-world schedule or paste your own RRULE.<br class="mobile-break"> Compare what each library actually returns.</p></section>
-    <section class="input-panel" aria-label="Recurrence input">
-      <div class="example-bar"><label for="example">Start with an example</label><select id="example" aria-describedby="example-description"><option value="" disabled>Custom RRULE</option></select></div>
-      <p id="example-description"></p>
-      <div class="editor-heading"><label for="editor">RRULE / iCalendar</label><button id="reset" class="text-button" hidden>Restore example</button></div>
-      <textarea id="editor" spellcheck="false" wrap="off" aria-describedby="input-help"></textarea>
-      <div class="input-actions"><p id="input-help">Include DTSTART for a reproducible start date. Multiple RRULE lines can describe a recurrence set.</p><div class="buttons"><button id="share" class="button secondary">Copy link</button><button id="run" class="button primary">Compare results <span aria-hidden="true">→</span></button><button id="cancel" class="button secondary" hidden>Stop</button></div></div>
-    </section>
-    <p id="feedback" role="status" class="feedback"></p>
-    <label id="copy-fallback" hidden>Copy the text below<textarea id="copy-text" readonly rows="3"></textarea></label>
-    <div class="results-heading"><div><h2>Results</h2><p id="reference-status"></p></div><label>Preview<select id="maximum"><option value="5">First 5</option><option value="10" selected>First 10</option><option value="20">First 20</option></select></label></div>
-    <div id="results" class="results-grid"></div>
-    <p id="run-status" class="visually-hidden" role="status" aria-live="polite"></p>
-    <div class="results-note"><p>Dates are displayed in UTC. Library defaults are used, with published versions pinned below.</p><span id="host"></span></div>
-    <details id="reference" class="reference"><summary>Why this example has an expected result</summary><p id="rationale"></p><pre id="expected"></pre><div id="sources"></div></details>
-    <p id="custom-note" class="custom-note" hidden>Custom input: results are shown without a correctness verdict. Named-zone Date conventions can differ between libraries.</p>
+  <a class="skip" href="#workspace">Skip to the rule editor</a>
+  <header class="topbar">
+    <div class="frame nav-row">
+      <a class="brand" href="./"><img src="./avatar.svg" width="30" height="30" alt=""><span>rrule<span>.net</span></span></a>
+      <nav aria-label="Main navigation"><a href="https://github.com/rrulenet/rrule/blob/main/docs/API.md">API reference</a><a href="https://github.com/rrulenet/rrule">GitHub ↗</a></nav>
+    </div>
+  </header>
+  <main class="frame" id="workspace">
+    <header class="intro">
+      <div><h1>RRULE Playground</h1><p>Build a recurrence, inspect its dates, and share it.</p></div>
+      <button type="button" class="button secondary" id="share">Copy share link</button>
+    </header>
+    <p id="feedback" role="status" class="notice" hidden></p>
+    <label id="copy-fallback" class="copy-panel" hidden>Copy this text<textarea id="copy-text" readonly rows="3"></textarea></label>
+
+    <div class="workspace-grid">
+      <section class="panel" aria-labelledby="rule-heading">
+        <div class="panel-head">
+          <div class="panel-title"><h2 id="rule-heading">Rule editor</h2></div>
+          <div class="segmented" role="group" aria-label="Input mode">
+            <button type="button" id="builder-mode" aria-pressed="true">Builder</button>
+            <button type="button" id="text-mode" aria-pressed="false">RRULE text</button>
+          </div>
+        </div>
+        <div class="panel-body">
+          <div class="preset-field"><label for="preset">Preset</label><select id="preset" aria-describedby="preset-description"><option value="">Custom rule</option></select></div>
+          <p class="preset-description" id="preset-description">Start with a preset or edit the rule below.</p>
+          <p class="message" id="editor-message" role="status" hidden></p>
+
+          <form id="builder-form" novalidate>
+            <div class="field-grid cadence">
+              <label>Frequency<select name="FREQ">
+                <option value="DAILY">Daily</option><option value="WEEKLY">Weekly</option><option value="MONTHLY">Monthly</option>
+                <option value="YEARLY">Yearly</option><option value="HOURLY">Hourly</option><option value="MINUTELY">Minutely</option><option value="SECONDLY">Secondly</option>
+              </select></label>
+              <label>Repeat every<div class="input-unit"><input name="INTERVAL" type="number" min="1" inputmode="numeric"><span id="interval-unit">month</span></div></label>
+            </div>
+
+            <fieldset class="form-section">
+              <legend>Start</legend>
+              <div class="field-grid">
+                <label>Start date<input name="start-date" type="date"></label>
+                <label id="start-time-field">Start time<input name="start-time" type="time" step="1"></label>
+              </div>
+              <div class="zone-field">
+                <label id="tzid-field">Time zone<input name="tzid" list="time-zones" placeholder="America/New_York" autocapitalize="off" spellcheck="false"></label>
+                <label class="check-label"><input name="all-day" type="checkbox"> All-day</label>
+              </div>
+              <datalist id="time-zones"></datalist>
+            </fieldset>
+
+            <fieldset class="form-section">
+              <legend>End</legend>
+              <div class="field-grid">
+                <label>End condition<select name="end"><option value="never">Never</option><option value="count">After a count</option><option value="until">On a date</option></select></label>
+                <label id="count-field">Occurrence count<input name="COUNT" type="number" min="0" inputmode="numeric"></label>
+                <label id="until-date-field">Through date<input name="until-date" type="date"></label>
+                <label id="until-time-field">Through time (UTC)<input name="until-time" type="datetime-local" step="1"></label>
+              </div>
+            </fieldset>
+
+            <details id="selector-panel" class="drawer">
+              <summary>Date and time filters<span id="filter-count" class="detail-count"></span></summary>
+              <div class="drawer-body">
+                <label>Weekdays <code>BYDAY</code><input name="BYDAY" placeholder="MO, WE, -1FR" spellcheck="false"></label>
+                <div class="weekday-buttons" id="weekdays" role="group" aria-label="Toggle weekdays"></div>
+                <div class="field-grid selector-fields" id="selector-fields"></div>
+                <label>Week starts on<select name="WKST" id="week-start"></select></label>
+              </div>
+            </details>
+            <details id="calendar-panel" class="drawer">
+              <summary>Calendar extensions</summary>
+              <div class="drawer-body field-grid">
+                <label>Calendar scale <code>RSCALE</code><select name="RSCALE">
+                  <option value="">Default</option><option value="GREGORIAN">Gregorian</option><option value="HEBREW">Hebrew</option><option value="CHINESE">Chinese</option><option value="INDIAN">Indian</option>
+                </select></label>
+                <label>Invalid dates <code>SKIP</code><select name="SKIP">
+                  <option value="">Default</option><option value="OMIT">Omit</option><option value="BACKWARD">Move backward</option><option value="FORWARD">Move forward</option>
+                </select></label>
+              </div>
+            </details>
+            <details id="exception-panel" class="drawer">
+              <summary>Additional and excluded dates</summary>
+              <div class="drawer-body">
+                <label>Exception date<input id="exception-date" type="date"></label>
+                <div class="date-actions">
+                  <button type="button" id="include-date" class="button secondary small">Include date</button>
+                  <button type="button" id="exclude-date" class="button secondary small">Exclude date</button>
+                </div>
+                <label>Date properties<textarea name="exceptions" rows="3" spellcheck="false" placeholder="EXDATE;VALUE=DATE:20260916"></textarea></label>
+                <p class="help">Added dates use the start time and zone. Edit the RDATE and EXDATE lines for other times.</p>
+              </div>
+            </details>
+          </form>
+
+          <form id="text-form" hidden>
+            <label for="editor">RRULE or iCalendar properties</label>
+            <textarea id="editor" spellcheck="false" rows="10" aria-describedby="input-help"></textarea>
+            <p id="input-help" class="help">Paste an RRULE, optionally with DTSTART, RDATE and EXDATE. Multiple rules can be entered here.</p>
+          </form>
+
+          <div class="editor-actions">
+            <button type="button" class="button secondary" id="copy-rule">Copy RRULE</button>
+            <button type="button" class="button primary" id="run">Preview rule <span aria-hidden="true">→</span></button>
+          </div>
+          <p id="implicit-start" class="help" hidden></p>
+        </div>
+      </section>
+
+      <section class="panel output" aria-labelledby="occurrences-heading">
+        <div class="panel-head output-head">
+          <div class="panel-title"><h2 id="occurrences-heading">Occurrences</h2><span id="zone-label" class="zone-label"></span></div>
+          <button type="button" class="button secondary small" id="cancel" hidden>Stop</button>
+        </div>
+        <div class="panel-body">
+          <div class="controls-row">
+            <label>Show up to <select id="maximum"><option value="12">12 dates</option><option value="24">24 dates</option><option value="48">48 dates</option></select></label>
+            <label>Display <select id="display-zone"><option value="rule">Rule time zone</option><option value="utc">UTC</option><option value="browser">My time zone</option></select></label>
+          </div>
+          <div class="description" id="description-box" hidden>
+            <p id="description"></p>
+            <label class="visually-hidden" for="language">Description language</label>
+            <select id="language"><option value="en">English</option><option value="fr">Français</option><option value="de">Deutsch</option><option value="es">Español</option><option value="pt">Português</option><option value="ja">日本語</option></select>
+            <p class="help" id="partial-description" hidden>This description covers part of the rule. Use its RRULE for all details.</p>
+          </div>
+          <div class="view-row">
+            <div class="segmented" role="group" aria-label="Result view">
+              <button type="button" id="list-view" aria-pressed="true">List</button>
+              <button type="button" id="calendar-view" aria-pressed="false">Calendar</button>
+            </div>
+            <p class="result-status" id="result-status" role="status"></p>
+          </div>
+          <ol class="occurrences" id="results" aria-label="Occurrence dates"></ol>
+          <div id="calendar" hidden>
+            <div class="month-nav"><button type="button" id="previous-month" aria-label="Previous month">←</button><h3 id="calendar-title"></h3><button type="button" id="next-month" aria-label="Next month">→</button></div>
+            <div id="calendar-grid"></div>
+            <p class="help">The calendar marks the dates in this preview.</p>
+          </div>
+          <p id="error" class="message error" role="alert" hidden></p>
+
+          <details id="query-panel" class="drawer">
+            <summary>Query a date or range</summary>
+            <form id="query-form" class="drawer-body" novalidate>
+              <label>Operation<select name="operation"><option value="after">First occurrence after</option><option value="before">Last occurrence before</option><option value="between">Occurrences between</option></select></label>
+              <div class="field-grid">
+                <label>Query start<input name="query-start" type="datetime-local" step="1"></label>
+                <label id="query-end-field" hidden>Query end<input name="query-end" type="datetime-local" step="1"></label>
+              </div>
+              <p id="query-zone-help" class="help">Enter times in the selected display time zone.</p>
+              <label class="check-label"><input name="inclusive" type="checkbox"> Include boundary times</label>
+              <div class="query-actions"><button type="submit" class="button primary">Run query</button><button type="button" class="button secondary" id="clear-query" hidden>Back to preview</button></div>
+            </form>
+          </details>
+          <details id="code-panel" class="drawer">
+            <summary>Use this rule in JavaScript</summary>
+            <div class="drawer-body"><pre><code id="snippet"></code></pre><button type="button" id="copy-code" class="button secondary small">Copy JavaScript</button></div>
+          </details>
+        </div>
+      </section>
+    </div>
   </main>
-  <footer><div><strong>Built by @rrulenet.</strong> Same input. Inspectable results.<p>Examples are predefined, not generated by AI. A time limit is not a correctness verdict.</p></div><div class="footer-links"><a href="https://github.com/rrulenet/rrule/issues">Report a discrepancy ↗</a><a href="./THIRD_PARTY_NOTICES.txt">Licenses</a></div></footer>
+  <footer class="frame"><span>Powered by <a id="engine-version" href="https://www.npmjs.com/package/@rrulenet/rrule">@rrulenet/rrule</a></span><div><a href="https://github.com/rrulenet/rrule/issues">Report an issue ↗</a><a href="./THIRD_PARTY_NOTICES.txt">Licenses</a></div></footer>
 </body>
 </html>

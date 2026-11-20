@@ -1,91 +1,100 @@
-import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createRequire } from 'node:module';
-import { execFileSync } from 'node:child_process';
-import { runInNewContext } from 'node:vm';
-import * as net from 'rrulenet-published';
-import * as temporal from 'rrule-temporal';
-import { cases, assess, findCase, canonical } from '../../comparison/cases.mjs';
-import { execute, snippet } from '../../comparison/execute.mjs';
+import { test } from 'node:test';
+import manifest from '../package.json' with { type: 'json' };
+import { fromBuilder, prepareText, readLink, shareURL, toBuilder } from '../src/model.mjs';
+import { defaultPreset, presets } from '../src/presets.mjs';
+import { getPreview } from '../src/preview.mjs';
 import { verifyInstall } from '../scripts/verify-install.mjs';
-const libs = { upstream: createRequire(import.meta.url)('rrule'), temporal, rrulenet: net };
-const request = fixture => ({ text: fixture.text, maximum: 10 });
 
-test('all three comparison packages and core resolve from the pinned registry install', () => {
-  const proof = verifyInstall();
-  assert.equal(proof['rrule-temporal'].version, '2.2.8');
-  assert.equal(proof['rrulenet-published'].version, '0.2.1');
-  assert.equal(proof['@rrulenet/core'].version, '0.2.1');
+const fixture = id => presets.find(value => value.id === id).text;
+const preview = (text, options = {}) => getPreview({ text, limit: 12, ...options });
+const days = result => result.occurrences.map(value => value.day);
+
+test('the playground resolves the pinned public version', () => {
+  assert.equal(verifyInstall()['@rrulenet/rrule'].version, manifest.dependencies['@rrulenet/rrule']);
 });
 
-test('practical control schedules match their independent reference in all engines', () => {
-  for (const fixture of cases.filter(value => value.control)) for (const [engine, lib] of Object.entries(libs)) {
-    assert.equal(assess(execute(engine, lib, request(fixture)), fixture.expected).kind, 'correct', `${fixture.id} ${engine}`);
+test('each preset returns dates and builder-compatible presets preserve their occurrences', () => {
+  for (const preset of presets) {
+    const expected = preview(preset.text);
+    assert(expected.occurrences.length, preset.id);
+    const data = toBuilder(preset.text);
+    if (preset.id === 'combined-schedules') assert.equal(data, null);
+    else {
+      assert(data, preset.id);
+      assert.deepEqual(preview(fromBuilder(data)).occurrences, expected.occurrences, preset.id);
+    }
   }
 });
 
-test('out-of-range rejection is distinguished from silently dropping the constraint, including strict mode', () => {
-  const fixture = cases.find(value => value.id === '676-byhour');
-  assert.equal(assess(execute('rrulenet', net, request(fixture)), fixture.expected).kind, 'correct');
-  assert.equal(assess(execute('temporal', temporal, request(fixture)), fixture.expected).label, 'Invalid input accepted');
-  const strict = new temporal.RRuleTemporal({ rruleString: fixture.text, strict: true });
-  assert.deepEqual(strict.all().map(value => new Date(value.epochMilliseconds).toISOString()), ['2026-01-01T00:00:00.000Z', '2026-01-02T00:00:00.000Z']);
-  assert.equal(assess({ status: 'error', stage: 'query', error: { message: 'Maximum iterations exceeded' } }, fixture.expected).kind, 'limited');
+test('curated presets demonstrate stable contract cases', () => {
+  assert.deepEqual(days(preview(fixture('last-weekday'), { limit: 3 })), ['2026-01-30', '2026-02-27', '2026-03-31']);
+  assert.deepEqual(days(preview(fixture('month-end'), { limit: 3 })), ['2026-01-31', '2026-03-31', '2026-05-31']);
+  assert.deepEqual(days(preview(fixture('leap-birthday'), { limit: 3 })), ['2024-02-29', '2025-02-28', '2026-02-28']);
+  assert.deepEqual(days(preview(fixture('easter-monday'), { limit: 2 })), ['2026-04-06', '2027-03-29']);
+  assert.deepEqual(preview(fixture('spring-forward'), { limit: 3 }).occurrences.map(value => value.time),
+    ['02:30:00', '03:30:00', '02:30:00']);
+  assert(preview(fixture('position-byhour')).occurrences.every(value => value.time === '10:00:00'));
+  assert(!days(preview(fixture('school-days'))).includes('2026-09-16'));
+  assert(days(preview(fixture('school-days'))).includes('2026-09-21'));
 });
 
-test('composition support is labelled separately and preserves the actual single-rule output', () => {
-  const fixture = cases.find(value => value.id === 'combined-schedules');
-  const actual = execute('temporal', temporal, request(fixture));
-  assert.equal(actual.status, 'ok'); assert.equal(actual.values.length, 3);
-  assert.equal(assess(actual, fixture.expected).kind, 'unsupported');
-  assert.equal(assess(execute('rrulenet', net, request(fixture)), fixture.expected).kind, 'correct');
+test('links round trip multiline input, offsets and preview size', () => {
+  const text = 'DTSTART;TZID="+05:30":20260101T090000\nRRULE:FREQ=DAILY;COUNT=2\nEXDATE:20260101T033000Z';
+  const url = shareURL('https://example.test/rrule/#workspace', text, 24, null);
+  assert.equal(url.pathname, '/rrule/');
+  assert.equal(url.hash, '');
+  assert.deepEqual(readLink(url), { text, preset: null, limit: 24, mode: 'text' });
+  assert.deepEqual(readLink(shareURL(url, text, 12, 'weekdays', 'builder')),
+    { text, preset: 'weekdays', limit: 12, mode: 'builder' });
+  assert.deepEqual(readLink(new URL('https://example.test/rrule/?case=weekdays&limit=10')),
+    { text: null, preset: 'weekdays', limit: 10, mode: 'text' });
+  const roundTrip = fromBuilder(toBuilder(text));
+  assert.match(roundTrip, /TZID="\+05:30"/);
+  assert.equal(preview(roundTrip).occurrences[0].offset, '+05:30');
 });
 
-test('the known leap-day DTSTART limitation is visible rather than graded as success', () => {
-  const fixture = cases.find(value => value.id === 'leap-birthday');
-  const actual = execute('rrulenet', net, request(fixture));
-  assert.equal(actual.values[0], '2017-02-28T12:00:00.000Z');
-  assert.equal(assess(actual, fixture.expected).kind, 'incorrect');
-  assert.equal(assess(execute('temporal', temporal, request(fixture)), fixture.expected).kind, 'correct');
-  assert.equal(assess(execute('upstream', libs.upstream, request(fixture)), fixture.expected).kind, 'unsupported');
+test('a bare rule uses a reproducible DTSTART and preserves folded text', () => {
+  const start = defaultPreset.text.split('\n')[0];
+  const prepared = prepareText('FREQ=WEEKLY;\r\n BYDAY=TH;COUNT=1', start);
+  assert.equal(prepared.text, start + '\nFREQ=WEEKLY;BYDAY=TH;COUNT=1');
+  assert(prepared.implicitStart);
+  assert.deepEqual(days(preview(prepared.text)), ['2026-01-01']);
+  for (const text of ['COUNT=2;FREQ=DAILY', 'RRULE:COUNT=2;FREQ=DAILY']) {
+    const reordered = prepareText(text, start);
+    assert(reordered.implicitStart);
+    assert.deepEqual(days(preview(reordered.text)), ['2026-01-01', '2026-01-02']);
+    assert.equal(toBuilder(reordered.text).COUNT, '2');
+  }
 });
 
-test('open-ended previews return only the requested prefix without adding COUNT to the rule', () => {
+test('builder preserves DATE UNTIL and validates conflicting or unsupported input', () => {
+  const data = toBuilder('DTSTART;VALUE=DATE:20260101\nRRULE:FREQ=DAILY;UNTIL=20260103');
+  assert(data['all-day']);
+  assert.equal(data['until-date'], '2026-01-03');
+  assert.deepEqual(days(preview(fromBuilder(data))), ['2026-01-01', '2026-01-02', '2026-01-03']);
+  assert.equal(toBuilder('DTSTART:20260101T000000Z\nRRULE:FREQ=DAILY;COUNT=2;UNTIL=20260103T000000Z'), null);
+  assert.equal(toBuilder('DTSTART:20260101T000000Z\nRRULE:FREQ=DAILY\nEXRULE:FREQ=WEEKLY'), null);
+  assert.equal(toBuilder('DTSTART:20260101T000000Z\nRRULE:FREQ=DAILY;COUNT=2=3'), null);
+  assert.throws(() => fromBuilder({ ...data, INTERVAL: '0' }), /positive integer/);
+  assert.throws(() => fromBuilder({ ...data, RSCALE: '', SKIP: 'FORWARD' }), /calendar scale/);
+});
+
+test('query windows preserve bounds and preview limits, including all-day display', () => {
   const text = 'DTSTART:20260101T090000Z\nRRULE:FREQ=DAILY';
-  for (const [engine, lib] of Object.entries(libs)) {
-    const actual = execute(engine, lib, { text, maximum: 3 });
-    assert.deepEqual(actual.values, ['2026-01-01T09:00:00.000Z', '2026-01-02T09:00:00.000Z', '2026-01-03T09:00:00.000Z']);
-    assert.equal(actual.more, true); assert(!actual.serialized.includes('COUNT='));
-  }
+  const query = { operation: 'between', start: '2026-01-02T09:00', end: '2026-01-06T09:00', inclusive: false };
+  const exclusive = preview(text, { limit: 2, query });
+  assert.deepEqual(days(exclusive), ['2026-01-03', '2026-01-04']);
+  assert(exclusive.hasMore);
+  assert.deepEqual(days(preview(text, { query: { ...query, inclusive: true } })),
+    ['2026-01-02', '2026-01-03', '2026-01-04', '2026-01-05', '2026-01-06']);
+  assert.throws(() => preview(text, { query: { ...query, end: query.start, start: query.end } }), /end must be/);
+  const allDay = preview(fixture('school-days'), { display: 'browser', browserZone: 'America/Los_Angeles' });
+  assert.equal(days(allDay)[0], '2026-09-02');
+  assert.equal(allDay.occurrences[0].time, null);
 });
 
-test('arbitrary input remains unscored and demo restrictions are not attributed to engines', () => {
-  const actual = execute('rrulenet', net, { text: 'FREQ=DAILY', maximum: 10 });
-  assert.equal(actual.stage, 'input'); assert.equal(actual.error.name, 'PlaygroundInputError');
-  assert.equal(assess(actual, { kind: 'reject' }).kind, 'unscored');
-  assert.equal(assess({ status: 'ok', values: [] }, undefined).kind, 'unscored');
-  assert.equal(assess({ status: 'timeout' }, { kind: 'dates', values: [] }).kind, 'timeout');
-});
-
-test('curated matching tolerates newline conventions, but never claims to understand a changed rule', () => {
-  assert.equal(findCase(cases[0].text.replaceAll('\n', '\r\n')).id, cases[0].id);
-  assert.equal(findCase(cases[0].text.replace('COUNT=4', 'COUNT=6')), undefined);
-  assert.equal(canonical('\n RRULE:FREQ=DAILY \n'), 'RRULE:FREQ=DAILY');
-});
-
-test('package-specific reproduction snippets execute using each library public API', () => {
-  const fixture = cases[0];
-  for (const engine of ['upstream', 'temporal', 'rrulenet']) {
-    const code = snippet(fixture.text, engine).replace("from '@rrulenet/rrule'", "from 'rrulenet-published'")
-      .replace('console.log(dates);', 'console.log(JSON.stringify(dates.map(value => new Date(value.epochMilliseconds ?? value.getTime()).toISOString())));');
-    const output = execFileSync(process.execPath, ['--input-type=module', '--eval', code], { cwd: new URL('../', import.meta.url), encoding: 'utf8', timeout: 5000 });
-    assert.deepEqual(JSON.parse(output), fixture.expected.values);
-  }
-});
-
-test('shared text remains data in copyable code', () => {
-  const text = 'DTSTART:20260101T090000Z\nRRULE:FREQ=DAILY;COUNT=2\n"; globalThis.injected = true; //';
-  let captured; const context = { rrule: { rrulestr(value) { captured = value; return { all() { return []; } }; } }, console: { log() {} } };
-  runInNewContext(snippet(text, 'upstream').replace(/^import[^\n]+\n/, ''), context);
-  assert.equal(context.injected, undefined); assert.equal(captured, text);
+test('invalid selectors surface an engine error and impossible rules return an empty preview', () => {
+  assert.throws(() => preview('DTSTART:20260101T000000Z\nRRULE:FREQ=DAILY;BYHOUR=25'), /BYHOUR/);
+  assert.deepEqual(days(preview('DTSTART:20260101T000000Z\nRRULE:FREQ=YEARLY;BYMONTH=2;BYMONTHDAY=30')), []);
 });

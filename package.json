@@ -43,7 +43,6 @@
     "coverage:badge": "node scripts/write-coverage-badge.mjs coverage-output.txt badges/coverage.json",
     "typecheck": "tsc --noEmit",
     "perf": "npm run build && node perf/perf.mjs",
-    "comparison:check": "npm --prefix playground run compare --workspaces=false",
     "playground:build": "npm --prefix playground run build --workspaces=false",
     "playground:preview": "npm --prefix playground run preview --workspaces=false"
   },

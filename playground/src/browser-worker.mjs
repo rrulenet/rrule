@@ -1,9 +1,9 @@
-import { execute } from '../../comparison/execute.mjs';
+import { getPreview } from './preview.mjs';
 
-export function startWorker(engine, lib) {
-  self.postMessage({ type: 'ready' });
-  self.onmessage = ({ data }) => {
-    const result = execute(engine, lib, data, value => self.postMessage({ type: 'progress', ...value }));
-    self.postMessage({ type: 'result', ...result });
-  };
-}
+self.onmessage = ({ data }) => {
+  try {
+    self.postMessage({ result: getPreview(data) });
+  } catch (error) {
+    self.postMessage({ error: error instanceof Error ? error.message : String(error), code: error?.code });
+  }
+};

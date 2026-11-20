@@ -19,5 +19,5 @@ const server = createServer(async (req, res) => {
     res.end(req.method === 'HEAD' ? undefined : await readFile(file));
   } catch { res.writeHead(404).end(); }
 });
-server.listen(port, '127.0.0.1', () => console.log(`Local: http://127.0.0.1:${port}/rrule/`));
+server.listen(port, '127.0.0.1', () => console.log(`Local: http://127.0.0.1:${server.address().port}/rrule/`));
 for (const signal of ['SIGINT', 'SIGTERM']) process.on(signal, () => server.close(() => process.exit(0)));

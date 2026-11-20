@@ -1,4 +1,4 @@
-name: Coverage and comparison Pages
+name: Coverage and Playground Pages
 
 on:
   workflow_dispatch:
@@ -14,7 +14,6 @@ on:
       - 'tsconfig.json'
       - 'scripts/write-coverage-badge.mjs'
       - '.github/workflows/coverage-badge.yml'
-      - 'comparison/**'
       - 'playground/**'
       - 'assets/**'
 
@@ -56,17 +55,15 @@ jobs:
       - name: Generate badge payload
         run: npm run coverage:badge
 
-      - name: Install pinned comparison packages
+      - name: Install the pinned playground engine
         working-directory: playground
         run: npm ci --ignore-scripts --workspaces=false
 
-      - name: Verify the shared examples and published engines
+      - name: Verify the presets and published engine
         working-directory: playground
         env:
           TZ: UTC
-        run: |
-          npm test
-          npm run compare
+        run: npm test
 
       - name: Build the playground and preserve coverage.json
         working-directory: playground

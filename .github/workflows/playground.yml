@@ -1,23 +1,23 @@
-name: Published package comparison
+name: RRULE Playground
 
 on:
   workflow_dispatch:
   pull_request:
-    paths: ['comparison/**', 'playground/**', '.github/workflows/comparison.yml', '.github/workflows/coverage-badge.yml']
+    paths: ['playground/**', '.github/workflows/playground.yml', '.github/workflows/coverage-badge.yml', '.nvmrc']
   push:
     branches: [main]
-    paths: ['comparison/**', 'playground/**', '.github/workflows/comparison.yml', '.github/workflows/coverage-badge.yml']
+    paths: ['playground/**', '.github/workflows/playground.yml', '.github/workflows/coverage-badge.yml', '.nvmrc']
 
 permissions:
   contents: read
 
 jobs:
-  corpus:
+  unit:
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
-        node: [22, 24]
+        node: [22, 24, 26]
         timezone: [UTC, America/New_York, Pacific/Kiritimati]
     env:
       TZ: ${{ matrix.timezone }}
@@ -33,12 +33,6 @@ jobs:
           cache-dependency-path: playground/package-lock.json
       - run: npm ci --ignore-scripts --workspaces=false
       - run: npm test
-      - run: npm run compare
-      - uses: actions/upload-artifact@v6
-        if: always()
-        with:
-          name: comparison-node-${{ matrix.node }}-${{ strategy.job-index }}
-          path: playground/reports/
   browser:
     runs-on: ubuntu-latest
     defaults:
@@ -48,15 +42,11 @@ jobs:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v6
         with:
-          node-version: 24
+          node-version-file: .nvmrc
           cache: npm
           cache-dependency-path: playground/package-lock.json
       - run: npm ci --ignore-scripts --workspaces=false
-      - run: npx playwright install --with-deps chromium
+      - run: npm install --global agent-browser@0.43.0
+      - run: agent-browser install --with-deps
       - run: npm run build
       - run: npm run test:browser
-      - uses: actions/upload-artifact@v6
-        if: failure()
-        with:
-          name: browser-failures
-          path: playground/test-results/
