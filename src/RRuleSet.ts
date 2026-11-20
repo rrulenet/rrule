@@ -3,10 +3,11 @@ import { Temporal } from 'temporal-polyfill';
 import { QueryMethodsSource } from '@rrulenet/core';
 import { DateSource, SetEngine, type SetExpression } from '@rrulenet/core/engine';
 import { dateToZdt, zdtToDate } from '@rrulenet/core/time';
+import { formatRfcDate } from '@rrulenet/core/rule';
 import { describeSetExpression, isSetExpressionFullyConvertible, type ToTextOptions } from '@rrulenet/core/text';
 
 import { RRule } from './RRule.js';
-import { cloneDate, isValidDate } from './dateutil.js';
+import { cloneDate, collectDateOccurrences, isValidDate } from './dateutil.js';
 
 export class RRuleSet extends RRule {
   public readonly _rrule: RRule[] = [];
@@ -15,6 +16,11 @@ export class RRuleSet extends RRule {
   public readonly _exdate: Date[] = [];
 
   private _dtstart?: Date | null;
+  private dtstartDate?: string;
+  private readonly dateTypes = {
+    RDATE: new Map<number, Set<string | undefined>>(),
+    EXDATE: new Map<number, Set<string | undefined>>(),
+  };
   private _tzid?: string;
   private engine = new SetEngine({ kind: 'union', expressions: [] });
   private readonly setNoCache: boolean;
@@ -51,8 +57,11 @@ export class RRuleSet extends RRule {
     return set;
   }
 
-  dtstart(value?: Date | null) {
-    if (value !== undefined) this._dtstart = value ? cloneDate(value) : null;
+  dtstart(value?: Date | null, plainDate?: string) {
+    if (value !== undefined) {
+      this._dtstart = value ? cloneDate(value) : null;
+      this.dtstartDate = plainDate;
+    }
     if (this._dtstart !== undefined) return this._dtstart ? cloneDate(this._dtstart) : null;
     const fallback = this._rrule.find((rule) => rule.origOptions.dtstart)?.origOptions.dtstart;
     return fallback ? cloneDate(fallback) : null;
@@ -67,7 +76,7 @@ export class RRuleSet extends RRule {
   private buildExpression(): SetExpression {
     const tzid = this._tzid ?? 'UTC';
     const include: SetExpression[] = [
-      ...this._rrule.map((rule) => ({ kind: 'source' as const, source: new QueryMethodsSource(rule) })),
+      ...this._rrule.map((rule) => ({ kind: 'source' as const, source: adaptRule(rule) })),
     ];
     if (this._rdate.length) {
       include.push({
@@ -77,7 +86,7 @@ export class RRuleSet extends RRule {
     }
 
     const exclude: SetExpression[] = [
-      ...this._exrule.map((rule) => ({ kind: 'source' as const, source: new QueryMethodsSource(rule) })),
+      ...this._exrule.map((rule) => ({ kind: 'source' as const, source: adaptRule(rule) })),
     ];
     if (this._exdate.length) {
       exclude.push({
@@ -122,10 +131,11 @@ export class RRuleSet extends RRule {
 
   override between(after: Date, before: Date, inc = false, iterator?: (date: Date, index: number) => boolean): Date[] {
     if (!isValidDate(after) || !isValidDate(before)) throw new Error('Invalid date');
-    const values = this.engine
-      .between(Temporal.Instant.from(after.toISOString()), Temporal.Instant.from(before.toISOString()), inc)
-      .map(zdtToDate);
-    return iterator ? applyIterator(values, iterator) : values;
+    const lower = Temporal.Instant.from(after.toISOString());
+    const upper = Temporal.Instant.from(before.toISOString());
+    return iterator
+      ? collectDateOccurrences(this.engine.iterateWindow({ after: lower, before: upper, inc }), iterator)
+      : this.engine.between(lower, upper, inc).map(zdtToDate);
   }
 
   override before(date: Date, inc = false): Date | null {
@@ -160,22 +170,42 @@ export class RRuleSet extends RRule {
     }
   }
 
-  rdate(date: Date) {
+  private addDate(kind: 'RDATE' | 'EXDATE', date: Date, plainDate?: string) {
     if (!(date instanceof Date)) throw new TypeError(`${String(date)} is not Date instance`);
-    if (!this._rdate.some((entry) => entry.getTime() === date.getTime())) {
-      this._rdate.push(cloneDate(date));
-      this._rdate.sort((a, b) => a.getTime() - b.getTime());
+    const values = kind === 'RDATE' ? this._rdate : this._exdate;
+    const stamp = date.getTime();
+    const exists = values.some((entry) => entry.getTime() === stamp);
+    const types = this.dateTypes[kind].get(stamp) ?? new Set(exists ? [undefined] : []);
+    types.add(plainDate);
+    this.dateTypes[kind].set(stamp, types);
+    if (!exists) {
+      values.push(cloneDate(date));
+      values.sort((a, b) => a.getTime() - b.getTime());
       this.sync();
     }
   }
 
-  exdate(date: Date) {
-    if (!(date instanceof Date)) throw new TypeError(`${String(date)} is not Date instance`);
-    if (!this._exdate.some((entry) => entry.getTime() === date.getTime())) {
-      this._exdate.push(cloneDate(date));
-      this._exdate.sort((a, b) => a.getTime() - b.getTime());
-      this.sync();
+  rdate(date: Date, plainDate?: string) {
+    this.addDate('RDATE', date, plainDate);
+  }
+
+  exdate(date: Date, plainDate?: string) {
+    this.addDate('EXDATE', date, plainDate);
+  }
+
+  private renderDates(kind: 'RDATE' | 'EXDATE', values: Date[]): string[] {
+    const dates = new Set<string>();
+    const times: Date[] = [];
+    for (const value of values) {
+      for (const type of this.dateTypes[kind].get(value.getTime()) ?? [undefined]) {
+        if (type === undefined) times.push(value);
+        else dates.add(formatRfcDate(type));
+      }
     }
+    const lines: string[] = [];
+    if (dates.size) lines.push(`${kind};VALUE=DATE:${[...dates].sort().join(',')}`);
+    if (times.length) lines.push(renderDateList(kind, times, this.tzid() ?? undefined));
+    return lines;
   }
 
   rrules() {
@@ -202,10 +232,13 @@ export class RRuleSet extends RRule {
       !this._exdate.length &&
       !!this._dtstart &&
       this._rdate.length === 1 &&
-      this._rdate[0]!.getTime() === this._dtstart.getTime();
+      this._rdate[0]!.getTime() === this._dtstart.getTime() &&
+      [...(this.dateTypes.RDATE.get(this._dtstart.getTime()) ?? [undefined])].every(type => type === this.dtstartDate);
 
     if (!this._rrule.length && this._dtstart) {
-      parts.push(renderDateProperty('DTSTART', this._dtstart, this.tzid() ?? undefined));
+      parts.push(this.dtstartDate
+        ? `DTSTART;VALUE=DATE:${formatRfcDate(this.dtstartDate)}`
+        : renderDateProperty('DTSTART', this._dtstart, this.tzid() ?? undefined));
     }
 
     for (const rule of this._rrule) {
@@ -223,11 +256,11 @@ export class RRuleSet extends RRule {
     }
 
     if (this._rdate.length && !isDtstartSingleton) {
-      parts.push(renderDateList('RDATE', this._rdate, this.tzid() ?? undefined));
+      parts.push(...this.renderDates('RDATE', this._rdate));
     }
 
     if (this._exdate.length) {
-      parts.push(renderDateList('EXDATE', this._exdate, this.tzid() ?? undefined));
+      parts.push(...this.renderDates('EXDATE', this._exdate));
     }
 
     return parts;
@@ -247,12 +280,15 @@ export class RRuleSet extends RRule {
 
   override clone() {
     const clone = new RRuleSet(this.setNoCache);
-    if (this._dtstart !== undefined) clone.dtstart(this._dtstart);
+    if (this._dtstart !== undefined) clone.dtstart(this._dtstart, this.dtstartDate);
     if (this._tzid !== undefined) clone.tzid(this._tzid);
     this._rrule.forEach((rule) => clone.rrule(rule.clone()));
     this._exrule.forEach((rule) => clone.exrule(rule.clone()));
-    this._rdate.forEach((date) => clone.rdate(date));
-    this._exdate.forEach((date) => clone.exdate(date));
+    for (const [kind, dates] of [['RDATE', this._rdate], ['EXDATE', this._exdate]] as const) {
+      for (const date of dates) {
+        for (const type of this.dateTypes[kind].get(date.getTime()) ?? [undefined]) clone.addDate(kind, date, type);
+      }
+    }
     return clone;
   }
 
@@ -282,14 +318,12 @@ export class RRuleSet extends RRule {
   }
 }
 
-function applyIterator(values: Date[], iterator: (date: Date, index: number) => boolean): Date[] {
-  const accepted: Date[] = [];
-  for (let index = 0; index < values.length; index += 1) {
-    const value = values[index]!;
-    if (!iterator(value, index)) break;
-    accepted.push(value);
-  }
-  return accepted;
+function adaptRule(rule: RRule) {
+  const spec = rule.getSpec();
+  // The classic facade rounds output to milliseconds, even for fromSpec() inputs.
+  const source = rule.constructor === RRule && ![spec.dtstart.microsecond, spec.dtstart.nanosecond].some(Boolean)
+    ? rule.getSource() : undefined;
+  return new QueryMethodsSource(rule, source);
 }
 
 function toCompactUtc(date: Date) {

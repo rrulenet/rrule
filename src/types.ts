@@ -24,10 +24,14 @@ export type Skip = 'OMIT' | 'BACKWARD' | 'FORWARD';
 export interface Options {
   freq: Frequency;
   dtstart: Date | null;
+  /** Original ISO calendar date for a date-only DTSTART. */
+  dtstartDate?: string;
   interval: number;
   wkst: Weekday | number | null;
   count: number | null;
   until: Date | null;
+  /** Original ISO calendar date for a date-only UNTIL. */
+  untilDate?: string;
   tzid: string | null;
   bysetpos: number | number[] | null;
   bymonth: ByMonth | ByMonth[] | null;

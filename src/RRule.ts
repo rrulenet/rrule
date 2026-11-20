@@ -9,7 +9,7 @@ import {
   type ToTextOptions,
 } from '@rrulenet/core/text';
 
-import { cloneDate, isValidDate } from './dateutil.js';
+import { cloneDate, collectDateOccurrences, isValidDate } from './dateutil.js';
 import { parseText as parseNaturalLanguageText } from './parseText.js';
 import type { Options } from './types.js';
 import { Frequency } from './types.js';
@@ -107,8 +107,11 @@ export class RRule {
 
   between(after: Date, before: Date, inc = false, iterator?: (date: Date, index: number) => boolean): Date[] {
     if (!isValidDate(after) || !isValidDate(before)) throw new Error('Invalid date');
-    const values = this.source.between(toInstant(after), toInstant(before), inc).map(zdtToDate);
-    return iterator ? applyIterator(values, iterator) : values;
+    const lower = toInstant(after);
+    const upper = toInstant(before);
+    return iterator
+      ? collectDateOccurrences(this.source.iterateWindow({ after: lower, before: upper, inc }), iterator)
+      : this.source.between(lower, upper, inc).map(zdtToDate);
   }
 
   before(date: Date, inc = false): Date | null {
@@ -169,14 +172,4 @@ export class RRule {
   getSource() {
     return this.source;
   }
-}
-
-function applyIterator(values: Date[], iterator: (date: Date, index: number) => boolean): Date[] {
-  const accepted: Date[] = [];
-  for (let index = 0; index < values.length; index += 1) {
-    const value = values[index]!;
-    if (!iterator(value, index)) break;
-    accepted.push(value);
-  }
-  return accepted;
 }

@@ -1,3 +1,6 @@
+import { zdtToDate } from '@rrulenet/core/time';
+import type { Temporal } from 'temporal-polyfill';
+
 export function datetime(
   year: number,
   month: number,
@@ -18,4 +21,17 @@ export function cloneDate(date: Date): Date {
 
 export function isValidDate(date: Date): boolean {
   return date instanceof Date && !Number.isNaN(date.getTime());
+}
+
+export function collectDateOccurrences(
+  values: Iterable<Temporal.ZonedDateTime>,
+  callback: (value: Date, index: number) => boolean,
+): Date[] {
+  const accepted: Date[] = [];
+  for (const value of values) {
+    const date = zdtToDate(value);
+    if (!callback(date, accepted.length)) break;
+    accepted.push(date);
+  }
+  return accepted;
 }

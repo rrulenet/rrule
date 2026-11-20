@@ -21,6 +21,8 @@ test('classic facade preserves yearly positions and repeated days through RFC an
 test('classic facade distinguishes impossible clock phases and exhausted calendar search', () => {
   const empty = rrulestr('DTSTART:20260708T082755Z\nRRULE:FREQ=MINUTELY;INTERVAL=10;BYMINUTE=0,10,20,30,40,50');
   assert.equal(empty.after(new Date('2026-07-08T08:27:55Z'), false), null);
-  const unresolved = rrulestr('DTSTART:20260101T090000Z\nRRULE:FREQ=YEARLY;BYMONTH=2;BYMONTHDAY=30;COUNT=1');
+  const impossible = rrulestr('DTSTART:20260101T090000Z\nRRULE:FREQ=YEARLY;BYMONTH=2;BYMONTHDAY=30;COUNT=1');
+  assert.deepEqual(impossible.all(), []);
+  const unresolved = rrulestr('DTSTART:20260101T090000Z\nRRULE:FREQ=MONTHLY;BYMONTH=2;BYMONTHDAY=30;COUNT=1');
   assert.throws(() => unresolved.all(), error => error.code === 'RECURRENCE_SEARCH_LIMIT');
 });

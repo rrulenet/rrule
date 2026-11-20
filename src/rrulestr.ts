@@ -9,11 +9,14 @@ export function rrulestr(input: string, rawOptions: Partial<RRuleStrOptions> = {
     noCache,
     sawInlineDtstart,
     dtstart,
+    dtstartDate,
     tzid,
     rruleValues,
     exruleValues,
     rdateValues,
     exdateValues,
+    rdatePlainDates,
+    exdatePlainDates,
     rawOptions: options,
   } = parseRRuleStringComponents(input, rawOptions);
 
@@ -28,8 +31,8 @@ export function rrulestr(input: string, rawOptions: Partial<RRuleStrOptions> = {
     const set = new RRuleSet(noCache);
     if (tzid) set.tzid(tzid);
     if (dtstart) {
-      set.dtstart(dtstart);
-      set.rdate(dtstart);
+      set.dtstart(dtstart, dtstartDate);
+      set.rdate(dtstart, dtstartDate);
     }
     return set;
   }
@@ -44,6 +47,7 @@ export function rrulestr(input: string, rawOptions: Partial<RRuleStrOptions> = {
         options.count,
         options.until,
         Boolean(options.dtstart && !options.tzid && tzid && !sawInlineDtstart),
+        dtstartDate,
       ),
       noCache,
     );
@@ -51,7 +55,7 @@ export function rrulestr(input: string, rawOptions: Partial<RRuleStrOptions> = {
 
   const set = new RRuleSet(noCache);
   if (tzid) set.tzid(tzid);
-  if (dtstart) set.dtstart(dtstart);
+  if (dtstart) set.dtstart(dtstart, dtstartDate);
 
   for (const value of rruleValues) {
     set.rrule(
@@ -63,6 +67,7 @@ export function rrulestr(input: string, rawOptions: Partial<RRuleStrOptions> = {
           options.count,
           options.until,
           Boolean(options.dtstart && !options.tzid && tzid && !sawInlineDtstart),
+          dtstartDate,
         ),
         noCache,
       ),
@@ -79,22 +84,18 @@ export function rrulestr(input: string, rawOptions: Partial<RRuleStrOptions> = {
           options.count,
           options.until,
           Boolean(options.dtstart && !options.tzid && tzid && !sawInlineDtstart),
+          dtstartDate,
         ),
         noCache,
       ),
     );
   }
 
-  for (const value of rdateValues) {
-    set.rdate(value);
-  }
-
-  for (const value of exdateValues) {
-    set.exdate(value);
-  }
+  rdateValues.forEach((value, index) => set.rdate(value, rdatePlainDates[index]));
+  exdateValues.forEach((value, index) => set.exdate(value, exdatePlainDates[index]));
 
   if (options.compatible && dtstart) {
-    set.rdate(dtstart);
+    set.rdate(dtstart, dtstartDate);
   }
 
   return set;
